@@ -1,0 +1,158 @@
+// file: prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------
+// ENUMS (Tipe Data Pilihan)
+// ------------------------------------------------------
+
+enum Role {
+  KASIR
+  OWNER
+}
+
+enum OrderType {
+  DINE_IN
+  TAKE_AWAY
+}
+
+enum OrderSource {
+  POS
+  LANDING_PAGE
+  GRAB_FOOD
+  SHOPEE_FOOD
+  GO_FOOD
+}
+
+enum PaymentMethod {
+  CASH
+  QRIS
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  APPROVED
+  PROCESSING
+  COMPLETED
+  CANCELLED
+}
+
+enum ShippingType {
+  PICKUP
+  DELIVERY
+}
+
+enum StockLogType {
+  IN
+  OUT
+}
+
+enum ExpenseCategory {
+  OPERATIONAL
+  BUMBU_TAMBAHAN
+  GAJI
+  LAINNYA
+}
+
+// ------------------------------------------------------
+// MODELS (Tabel Database)
+// ------------------------------------------------------
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  username  String   @unique
+  password  String
+  role      Role     @default(KASIR)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
+}
+
+model Product {
+  id        String   @id @default(uuid())
+  name      String
+  price     Float    // Harga Jual
+  cogs      Float    // HPP / Modal Bahan
+  stock     Int      @default(0)
+  category  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactionDetails TransactionDetail[]
+  stockLogs          StockLog[]
+}
+
+model StockLog {
+  id        String       @id @default(uuid())
+  productId String
+  type      StockLogType
+  qty       Int
+  note      String?
+  createdAt DateTime     @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id              String        @id @default(uuid())
+  invoiceNo       String        @unique
+  orderType       OrderType     @default(DINE_IN)
+  orderSource     OrderSource   @default(POS)
+  shippingType    ShippingType  @default(PICKUP)
+  totalAmount     Float         // Total Omzet
+  totalCogs       Float         // Total Modal / HPP
+  paymentMethod   PaymentMethod @default(CASH)
+  paymentStatus   PaymentStatus @default(PENDING)
+  status          OrderStatus   @default(PENDING)
+
+  // Field Khusus Pre-Order Landing Page / Delivery
+  customerName    String?
+  customerPhone   String?
+  shippingAddress String?       @db.Text
+  pickupTime      DateTime?
+
+  cashierId       String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  cashier User?               @relation(fields: [cashierId], references: [id])
+  details TransactionDetail[]
+}
+
+model TransactionDetail {
+  id            String   @id @default(uuid())
+  transactionId String
+  productId     String
+  variantPiece  String?  // Potongan Ayam (misal: "Dada", "Paha", "Sayap")
+  qty           Int
+  price         Float    // Harga Jual saat Transaksi
+  subtotal      Float    // qty * price
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id])
+}
+
+model Expense {
+  id        String          @id @default(uuid())
+  title     String
+  category  ExpenseCategory @default(OPERATIONAL)
+  amount    Float
+  date      DateTime        @default(now())
+  note      String?
+  createdAt DateTime        @default(now())
+}
